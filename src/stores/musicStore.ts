@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { DEFAULT_MUSIC_ROOT, loadConfig, saveConfig, scanMusicRoot } from '../api/tauri';
+import { DEFAULT_MUSIC_ROOT, getDefaultMusicDir, loadConfig, saveConfig, scanMusicRoot } from '../api/tauri';
 import type { AppConfig, Playlist, PlayMode } from '../types/music';
 
 interface MusicState {
@@ -21,6 +21,25 @@ const defaultConfig: AppConfig = {
   playMode: 'listLoop',
   theme: 'system',
 };
+
+const LAST_MUSIC_ROOT_STORAGE_KEY = 'minimusic:last-music-root';
+
+function loadSavedMusicRoot(): string | undefined {
+  try {
+    const rootPath = window.localStorage.getItem(LAST_MUSIC_ROOT_STORAGE_KEY)?.trim();
+    return rootPath || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function saveMusicRoot(rootPath: string) {
+  try {
+    window.localStorage.setItem(LAST_MUSIC_ROOT_STORAGE_KEY, rootPath);
+  } catch {
+    // The Rust config remains the primary persistence mechanism.
+  }
+}
 
 function normalizePlayMode(mode: unknown): PlayMode {
   return mode === 'singleLoop' || mode === 'shuffle' ? mode : 'listLoop';
@@ -57,26 +76,46 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   loadInitialLibrary: async () => {
     try {
       const loadedConfig = normalizeConfig({ ...defaultConfig, ...(await loadConfig()) });
-      const rootPath = loadedConfig.musicRootPath || DEFAULT_MUSIC_ROOT;
+      let rootPath = loadedConfig.musicRootPath || loadSavedMusicRoot() || DEFAULT_MUSIC_ROOT;
+      if (!rootPath) {
+        try {
+          rootPath = await getDefaultMusicDir();
+        } catch {
+          // 获取系统默认音乐目录失败，保持空
+        }
+      }
       set({ config: loadedConfig, musicRootPath: rootPath });
-      await get().scanRoot(rootPath);
+      if (rootPath) {
+        await get().scanRoot(rootPath);
+      }
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : String(error),
-        config: defaultConfig,
-        musicRootPath: DEFAULT_MUSIC_ROOT,
       });
     }
   },
 
   scanRoot: async (rootPath: string) => {
-    set({ isScanning: true, error: undefined });
+    // Persist the selected folder before scanning it. Scanning a large library can
+    // take time or fail because of a single unreadable file; neither case should
+    // make the user's folder choice disappear on the next launch.
+    const nextConfig = normalizeConfig({ ...get().config, musicRootPath: rootPath });
+    saveMusicRoot(rootPath);
+    set({ config: nextConfig, isScanning: true, error: undefined, musicRootPath: rootPath });
+
+    try {
+      await saveConfig(nextConfig);
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     try {
       const playlists = await scanMusicRoot(rootPath);
-      const selectedPlaylistId = pickInitialPlaylist(playlists, get().config.lastPlaylistId);
-      set({ playlists, selectedPlaylistId, musicRootPath: rootPath, isScanning: false });
-      await get().updateConfig({ musicRootPath: rootPath, lastPlaylistId: selectedPlaylistId });
+      const selectedPlaylistId = pickInitialPlaylist(playlists, nextConfig.lastPlaylistId);
+      set({ playlists, selectedPlaylistId, isScanning: false });
+      await get().updateConfig({ lastPlaylistId: selectedPlaylistId });
     } catch (error) {
       set({
         isScanning: false,

@@ -51,7 +51,7 @@ pub struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            music_root_path: Some("/Users/magl/Library/CloudStorage/OneDrive-个人/音乐".to_string()),
+            music_root_path: None,
             last_playlist_id: None,
             last_song_id: None,
             volume: 0.8,

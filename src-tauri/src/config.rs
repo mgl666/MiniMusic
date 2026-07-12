@@ -33,6 +33,13 @@ pub fn save_config(app: AppHandle, mut config: AppConfig) -> Result<(), String> 
     fs::write(path, content).map_err(|_| "配置保存失败".to_string())
 }
 
+#[tauri::command]
+pub fn get_default_music_dir() -> Result<String, String> {
+    dirs::audio_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .ok_or_else(|| "无法获取系统音乐目录".to_string())
+}
+
 fn config_path(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app
         .path()

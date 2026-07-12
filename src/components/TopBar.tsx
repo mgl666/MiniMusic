@@ -103,7 +103,6 @@ export function TopBar() {
                   aria-haspopup="menu"
                   aria-expanded={isThemeMenuOpen}
                   onClick={() => setIsThemeMenuOpen((open) => !open)}
-                  onMouseEnter={() => setIsThemeMenuOpen(true)}
                 >
                   <span>主题</span>
                   <em>{currentTheme} ›</em>

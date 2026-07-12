@@ -2,7 +2,7 @@ import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import type { AppConfig, CoverArt, LyricSource, Playlist } from '../types/music';
 
-export const DEFAULT_MUSIC_ROOT = '/Users/magl/Library/CloudStorage/OneDrive-个人/音乐';
+export const DEFAULT_MUSIC_ROOT = '';
 
 export function loadConfig(): Promise<AppConfig> {
   return invoke<AppConfig>('load_config');
@@ -22,6 +22,10 @@ export function readLyric(source: LyricSource): Promise<string> {
 
 export function readCoverArt(audioPath: string): Promise<CoverArt | null> {
   return invoke<CoverArt | null>('read_cover_art', { audioPath });
+}
+
+export function getDefaultMusicDir(): Promise<string> {
+  return invoke<string>('get_default_music_dir');
 }
 
 export async function selectMusicRoot(): Promise<string | null> {

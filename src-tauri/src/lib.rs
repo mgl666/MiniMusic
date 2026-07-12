@@ -25,18 +25,27 @@ pub fn run() {
                 let window = window.clone();
                 let app = window.app_handle().clone();
 
+                #[cfg(target_os = "windows")]
+                let minimize_label = "最小化到任务栏";
+
+                #[cfg(target_os = "macos")]
+                let minimize_label = "最小化到 Dock";
+
                 app.dialog()
-                    .message("你想把 MiniMusic 最小化到 Dock，还是直接退出应用？")
+                    .message("你想把 MiniMusic 最小化，还是直接退出应用？")
                     .title("关闭 MiniMusic")
                     .kind(MessageDialogKind::Info)
                     .buttons(MessageDialogButtons::OkCancelCustom(
-                        "最小化到 Dock".to_string(),
+                        minimize_label.to_string(),
                         "退出应用".to_string(),
                     ))
                     .parent(&window)
                     .show_with_result(move |result| match result {
                         MessageDialogResult::Custom(action) if action == "退出应用" => app.exit(0),
                         _ => {
+                            #[cfg(target_os = "windows")]
+                            let _ = window.minimize();
+                            #[cfg(target_os = "macos")]
                             let _ = window.hide();
                         }
                     });
@@ -47,7 +56,8 @@ pub fn run() {
             lyrics::read_lyric,
             media::read_cover_art,
             config::load_config,
-            config::save_config
+            config::save_config,
+            config::get_default_music_dir
         ])
         .build(tauri::generate_context!())
         .expect("error while building MiniMusic")
